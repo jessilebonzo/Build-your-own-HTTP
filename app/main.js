@@ -36,14 +36,14 @@ const server = net.createServer((socket) => {
       const filename = path.split("/files/")[1];
       if (fs.existsSync(`${directory}/${filename}`)) {
         const content = fs.readFileSync(`${directory}/${filename}`).toString();
-        const res = `HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: ${content.length}\r\n\r\n${content}\r\n`;
+        const res = `HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: ${content.length}\r\n\r\n${content}`;
         socket.write(res);
       } else {
-        socket.write("HTTP/1.1 404 Not Found\r\n\r\n");
+        socket.write("HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: 0\r\n\r\n");
       }
     } 
     else {
-      socket.write("HTTP/1.1 404 Not Found\r\n\r\n");
+      socket.write("HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: 0\r\n\r\n");
     }
   });
 });
