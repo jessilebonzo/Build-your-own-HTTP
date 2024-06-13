@@ -1,73 +1,72 @@
-const fs = require("fs");
 const net = require("net");
-const zlib = require('zlib');
-
-const HTTP_OK = "HTTP/1.1 200 OK\r\n";
-const HTTP_NOT_FOUND = "HTTP/1.1 404 Not Found\r\n\r\n";
-const HTTP_CREATED = "HTTP/1.1 201 Created\r\n\r\n";
-
+const fs = require("fs");
+const path = require("path");
+const { parseData, parseArgs, formatRes, simpleRes, HTTP_CODES } = require("./utils");
+const zlib = require("zlib");
+// Uncomment this to pass the first stage
 const server = net.createServer((socket) => {
-    socket.on("close", () => {
-        socket.end();
-    });
-    socket.on("data", (data) => {
-        handleData(socket, data);
-    });
-});
-
-server.listen(4221, "localhost");
-
-function handleData(socket, data) {
-    const requestLineItems = parseRequestLine(data);
-    const currentPath = requestLineItems['path'];
-    const currentMethod = requestLineItems['method'];
-
-    if (currentPath === '/') {
-        writeSocketMessage(socket, HTTP_OK);
-    } else if (currentPath.startsWith('/echo')) {
-        const bodyContent = currentPath.split('/')[2];
-        const bodyContentLength = Buffer.byteLength(bodyContent);
-
-        const encodingMethods = getEncodingMethods(data);
-        let response = '';
-
-        if (encodingMethods.includes('gzip')) {
-            const bodyEncoded = zlib.gzipSync(bodyContent);
-            const bodyEncodedLength = Buffer.byteLength(bodyEncoded);
-
-            response = `${HTTP_OK}Content-Encoding: gzip\r\nContent-Type: text/plain\r\nContent-Length: ${bodyEncodedLength}\r\n\r\n`;
-            socket.write(response);
-            socket.write(bodyEncoded);
-            socket.end();
-        } else {
-            response = `${HTTP_OK}Content-Type: text/plain\r\nContent-Length: ${bodyContentLength}\r\n\r\n${bodyContent}`;
-            writeSocketMessage(socket, response);
-        }
-    } else {
-        writeSocketMessage(socket, HTTP_NOT_FOUND);
-    }
-}
-
-function parseRequestLine(data) {
-    const request = data.toString();
-    const lines = request.split('\r\n');
-    const method = lines[0].split(" ")[0];
-    const path = lines[0].split(" ")[1];
-    return {'method': method, 'path': path};
-}
-
-function getEncodingMethods(data) {
-    const request = data.toString();
-    const lines = request.split('\r\n');
-    const acceptEncodingHeader = lines.find(line => line.toLowerCase().startsWith('accept-encoding'));
-    if (acceptEncodingHeader) {
-        const encodingMethods = acceptEncodingHeader.split(": ")[1].split(", ");
-        return encodingMethods;
-    }
-    return [];
-}
-
-function writeSocketMessage(socket, message) {
-    socket.write(message);
+  socket.setEncoding("utf8");
+  socket.on("close", () => {
     socket.end();
-}
+  });
+  socket.on("data", (data) => {
+    const req = parseData(data);
+    const args = parseArgs(process.argv);
+    console.log(req);
+    switch (req.method) {
+        case "GET":
+            if (req.endpoint === "echo") {
+                if (req.encoding === "gzip") {
+                    const body = zlib.gzipSync(req.getBody);
+                    socket.write(`HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Encoding: gzip\r\nContent-Length: ${Buffer.byteLength(body)}\r\n\r\n`);
+                    socket.write(body);
+                    break;
+                }
+                socket.write(formatRes([HTTP_CODES.OK, req.encoding, "text/plain", req.getBody]));
+                break;
+            }
+            if (req.endpoint === "user-agent") {
+                socket.write(formatRes([HTTP_CODES.OK,,"text/plain", req.agent]));
+                break;
+            }
+            if (req.endpoint === "files") {
+                if (args.directory.index === -1) {
+                    socket.write(simpleRes(HTTP_CODES.SERVER_ERR));
+                    break;
+                }
+                const filePath = path.join(args.directory.value, req.getBody);
+                if (!fs.existsSync(filePath)) {
+                    socket.write(simpleRes(HTTP_CODES.NOT_FOUND));
+                    break;
+                }
+                const body = fs.readFileSync(filePath).toString("utf-8");
+                socket.write(formatRes([HTTP_CODES.OK,, "application/octet-stream", body]));
+                break;
+            }
+            if (req.path === "/") {
+                socket.write(simpleRes(HTTP_CODES.OK));
+                break;
+            }
+            socket.write(simpleRes(HTTP_CODES.NOT_FOUND));
+            break;
+        case "POST":
+            if (req.endpoint === "files") {
+                if (args.directory.index === -1) {
+                    socket.write(simpleRes(HTTP_CODES.SERVER_ERR));
+                    break;
+                }
+                const filePath = path.join(args.directory.value, req.getBody);
+                fs.writeFileSync(filePath, req.postBody, "utf-8");
+                socket.write(formatRes([HTTP_CODES.CREATED,, "application/octet-stream", req.postBody]));
+                break;
+            }
+            socket.write(simpleRes(HTTP_CODES.NOT_FOUND));
+            break;
+        default:
+            socket.write(simpleRes(HTTP_CODES.NOT_FOUND));
+            break;
+    }
+    socket.end();
+  });
+});
+server.listen(4221, "localhost");
