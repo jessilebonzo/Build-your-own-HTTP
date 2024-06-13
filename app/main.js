@@ -1,81 +1,84 @@
 const net = require("net");
-const fs = require("fs");
+const process = require("process");
+const fs = require("node:fs/promises")
 // You can use print statements as follows for debugging, they'll be visible when running tests.
 console.log("Logs from your program will appear here!");
-const parseRequest = (requestData) => {
-    const request = requestData.toString().split("\r\n");
-    const [method, url, protocol] = request[0].split(" ");
-    const headers = {};
-    request.slice(1).forEach((header) => {
-        const [key, value] = header.split(" ");
-        if (key && value) {
-            headers[key] = value;
+// function buildResponse(response) {
+//     const responseHeaders = []
+//     response.headers.forEach((value) => { responseHeaders.push(value.join(": ")) })
+//     return `${response.protocol} ${response.code}\r\n${responseHeaders.join("\r\n")}\r\n\r\n${response.content}`
+// }
+const arguments = process.argv
+let filepath = ""
+if (arguments.includes("--directory")) {
+    filepath = arguments[arguments.indexOf("--directory") + 1]
+}
+const server = net.createServer((socket) => {
+    socket.on('data', async (buffer) => {
+        const [requestStatus, requestContent] = buffer.toString('utf-8').split("\r\n\r\n")
+        const [requestMethod, requestPath, requestProtocol] = requestStatus.split(" ")
+        let requestHeaders = []
+        requestStatus.split("\r\n").forEach((value) => {
+            requestHeaders.push(value.toLowerCase().split(": "))
+        })
+        // let response = {
+        //     protocol: "HTTP/1.1",
+        //     code: "404 Not Found",
+        //     headers: [
+        //         ["content-type", "text/plain"],
+        //         ["content-length", 0],
+        //     ],
+        //     content: ""
+        // }
+        if (requestPath === "/") {
+            socket.write(`HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 0\r\n\r\n`)
+            return
         }
-    });
-    return { method, url, protocol, headers };
-  };
-  // Uncomment this to pass the first stage
-  const server = net.createServer((socket) => {
-      socket.on("data", (data) => {
-          const request = parseRequest(data);
-          const { method, url, protocol, headers } = request;
-          console.log(`Request: ${method} ${url} ${protocol}`);
-          console.log(headers);
-
-          function response(contentType, content, encoding) {
-            let rsp = "HTTP/1.1 200 OK\r\n";
-            if (encoding != null) {
-                rsp += `Content-Encoding: ${encoding}\r\n`;
+        if (requestPath.startsWith("/echo/")) {
+            const echoString = requestPath.replace("/echo/", "")
+            let acceptEncoding = null
+            for (const header of requestHeaders) {
+                if (header[0] === "accept-encoding" && header[1].includes("gzip")) {
+                    acceptEncoding = "gzip"
+                    break
+                }
             }
-            rsp += `Content-Type: ${contentType}\r\n`;
-            rsp += `Content-Length: ${content.length}\r\n`;
-            rsp += `\r\n${content}\r\n`;
-            socket.write(rsp);
+            socket.write(`HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n${acceptEncoding ? `Content-Encoding: ${acceptEncoding}\r\n` : ""}Content-Length: ${echoString.length}\r\n\r\n${echoString}`)
+            return
         }
-        function notfound() {
-          socket.write("HTTP/1.1 404 Not Found\r\n\r\n");
-      }
-      if (url === "/") {
-          socket.write("HTTP/1.1 200 OK\r\n\r\n");
-      } else if (url.startsWith("/echo/")) {
-          const echo = url.split("/echo/")[1]
-          if (headers.hasOwnProperty("Accept-Encoding:") && headers["Accept-Encoding:"] === "gzip") {
-            //console.log(headers["Accept-Encoding:"]);
-            const encoding = headers["Accept-Encoding:"];
-            response("text/plain", echo, encoding);
-        }
-        else {
-            response("text/plain", echo);
-        }
-    } else if (url.startsWith("/user-agent")) {
-      const userAgent = headers["User-Agent:"];
-            response("text/plain", userAgent);
-          } else if (url.startsWith("/files/") && method === "GET") {
-            const filePath = process.argv[3];
-            const fileName = url.split("/files/")[1];
-            console.log(`${filePath}/${fileName}`)
-            if (fs.existsSync(`${filePath}/${fileName}`)) {
-                const file = fs.readFileSync(`${filePath}/${fileName}`).toString();
-                response("application/octet-stream", file);
-            } else {
-                notfound();
+        if (requestPath === "/user-agent") {
+            let userAgent = ""
+            for (const header of requestHeaders) {
+                if (header[0] === "user-agent") {
+                    userAgent = header[1]
+                    break
+                }
             }
-        } else if (url.startsWith("/files/") && method === "POST") {
-            const fileName = process.argv[3] + "/" + url.substring(7);
-            const req = data.toString().split("\r\n");
-            const body = req[req.length - 1];
-
-            fs.writeFileSync(fileName, body);
-            socket.write("HTTP/1.1 201 Created\r\n\r\n")
+            socket.write(`HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: ${userAgent.length}\r\n\r\n${userAgent}`)
+            return
         }
-        else {
-            notfound();
+        if (filepath !== "" && requestPath.startsWith("/files/") && requestMethod === "GET") {
+            const filename = requestPath.replace("/files/", "")
+            let stat
+            try {
+                stat = await fs.stat(filepath + filename)
+            } catch (err) {
+                socket.write("HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: 0\r\n\r\n")
+                return
+            }
+            const content = await fs.readFile(filepath + filename)
+            socket.write(`HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: ${stat.size}\r\n\r\n`)
+            socket.write(content)
+            return
         }
-    });
-    socket.on("error", (err) => {
-        conseole.log("ERROR: " + err);
-        socket.end();
-    });
+        if (filepath !== "" && requestPath.startsWith("/files/") && requestMethod === "POST") {
+            const filename = requestPath.replace("/files/", "")
+            await fs.writeFile(filepath + filename, requestContent)
+            socket.write(`HTTP/1.1 201 Created\r\nContent-Type: text/plain\r\nContent-Length: 0\r\n\r\n`)
+            return
+        }
+        socket.write("HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: 0\r\n\r\n")
+    })
     socket.on("close", () => {
         socket.end();
     });
