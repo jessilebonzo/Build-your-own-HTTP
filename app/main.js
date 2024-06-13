@@ -1,5 +1,5 @@
 const net = require("net");
-
+const fs = require("fs");
 
 console.log("Logs from your program will appear here!");
 
@@ -17,10 +17,12 @@ const server = net.createServer((socket) => {
 
     if (path === '/') {
       socket.write("HTTP/1.1 200 OK\r\n\r\n");
-    } else if (path.includes("/echo/")) {
+    } 
+    else if (path.includes("/echo/")) {
       const content = path.split('/echo/')[1];
       socket.write(`HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: ${content.length}\r\n\r\n${content}`);
-    } else if (path === '/user-agent') {
+    } 
+    else if (path === '/user-agent') {
       const userAgentHeader = headers.find(header => header.startsWith('User-Agent:'));
       if (userAgentHeader) {
         const userAgent = userAgentHeader.split('User-Agent: ')[1];
@@ -28,7 +30,19 @@ const server = net.createServer((socket) => {
       } else {
         socket.write("HTTP/1.1 400 Bad Request\r\n\r\nNo User-Agent header found");
       }
-    } else {
+    } 
+    else if (path.startsWith("/files/")) {
+      const directory = process.argv[3];
+      const filename = path.split("/files/")[1];
+      if (fs.existsSync(`${directory}/${filename}`)) {
+        const content = fs.readFileSync(`${directory}/${filename}`).toString();
+        const res = `HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: ${content.length}\r\n\r\n${content}\r\n`;
+        socket.write(res);
+      } else {
+        socket.write("HTTP/1.1 404 Not Found\r\n\r\n");
+      }
+    } 
+    else {
       socket.write("HTTP/1.1 404 Not Found\r\n\r\n");
     }
   });
