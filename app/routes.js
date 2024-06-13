@@ -77,73 +77,72 @@ function echoHandler(data) {
  */
 const useragentHandler = (data) => {
     const headers = getHeaders(data)
-    const userAgentHeader = headers.find(header => header.name === "user-agent")
     return new types.Response(
-        new types.StatusCode(200, "OK"),
-        [
-            new types.Header("Content-Type", "text/plain"),
-            new types.Header("Content-Length", userAgentHeader.value.length)
-        ],
-        userAgentHeader.value
-    );
+      new types.StatusCode(200, "OK"),
+      [
+          new types.Header("Content-Type", "text/plain"),
+          new types.Header("Content-Length", userAgentHeader.value.length)
+      ],
+      userAgentHeader.value
+  );
 }
 /**
- * @param {Buffer} data
- * @returns {types.Response}
- */
+* @param {Buffer} data
+* @returns {types.Response}
+*/
 const filesGetHandler = (data) => {
-    const url = getRequestPath(data);
-    const path = url.split("/files/")[1]
-    const filePath = `${directoryArg}/${path}`
-    console.log(filePath)
-    try {
-        const body = fs.readFileSync(filePath)
-        return new types.Response(
-            new types.StatusCode(200, "OK"),
-            [
-                new types.Header("Content-Type", "application/octet-stream"),
-                new types.Header("Content-Length", body.length)
-            ],
-            body
-        )
-    } catch (error) {
-        console.log(error)
-        return new types.Response(
-            new types.StatusCode(404, "Not Found"),
-            [],
-            ""
-        )
-    }
+  const url = getRequestPath(data);
+  const path = url.split("/files/")[1]
+  const filePath = `${directoryArg}/${path}`
+  console.log(filePath)
+  try {
+      const body = fs.readFileSync(filePath)
+      return new types.Response(
+          new types.StatusCode(200, "OK"),
+          [
+              new types.Header("Content-Type", "application/octet-stream"),
+              new types.Header("Content-Length", body.length)
+          ],
+          body
+      )
+  } catch (error) {
+      console.log(error)
+      return new types.Response(
+          new types.StatusCode(404, "Not Found"),
+          [],
+          ""
+      )
+  }
 }
 /**
- * @param {Buffer} data
- * @returns {types.Response}
- */
+* @param {Buffer} data
+* @returns {types.Response}
+*/
 const filesPostHandler = (data) => {
-    const url = getRequestPath(data);
-    const path = url.split("/files/")[1]
-    const filePath = `${directoryArg}/${path}`
-    const body = getBody(data)
-    fs.writeFileSync(filePath, body)
-    return new types.Response(
-        new types.StatusCode(201, "Created"),
-        [],
-        ""
-    )
+  const url = getRequestPath(data);
+  const path = url.split("/files/")[1]
+  const filePath = `${directoryArg}/${path}`
+  const body = getBody(data)
+  fs.writeFileSync(filePath, body)
+  return new types.Response(
+      new types.StatusCode(201, "Created"),
+      [],
+      ""
+  )
 }
 addRoute(
-    "/", indexHandler
+  "/", indexHandler
 )
 addRoute("/user-agent", useragentHandler)
 addRoute(
-    "/echo/{}", echoHandler
+  "/echo/{}", echoHandler
 )
 addRoute(
-    "/files/{}", filesGetHandler
+  "/files/{}", filesGetHandler
 )
 addRoute(
-    "/files/{}", filesPostHandler, "POST"
+  "/files/{}", filesPostHandler, "POST"
 )
 module.exports = {
-    "getHandler": getHandler
+  "getHandler": getHandler
 }

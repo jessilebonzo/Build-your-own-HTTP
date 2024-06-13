@@ -25,14 +25,14 @@ function handleData(data) {
     }
     const result = [statusData, headersData, response.body]
     return result.join("\r\n");
-}
-/**
- * @param {net.Socket} socket
- */function getListener(socket) {
-    return (data) => {
-        const responseData = handleData(data);
-        console.log(responseData)
-        socket.write(responseData);
-    }
-}
-module.exports = {"getListener": getListener};
+  }
+  /**
+   * @param {net.Socket} socket
+   */function getListener(socket) {
+      return (data) => {
+          const responseData = handleData(data);
+          console.log(responseData)
+          socket.write(responseData);
+      }
+  }
+  module.exports = {"getListener": getListener};
