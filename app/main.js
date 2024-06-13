@@ -1,40 +1,18 @@
 const net = require("net");
 
+console.log("Logs from your program will appear here!");
 const server = net.createServer((socket) => {
-  socket.on("data", (data) => {
-    const request = data.toString();
-    const [requestLine] = request.split('\r\n');
-    const [method, path] = requestLine.split(' ');
-
-    if (method === 'GET' && path === '/') {
-      const httpResponse = 
-        'HTTP/1.1 200 OK\r\n' +
-        'Content-Type: text/plain\r\n' +
-        'Content-Length: 13\r\n' +
-        '\r\n' +
-        'Hello, world!';
-      socket.write(httpResponse);
-    } else {
-      const httpResponse = 
-        'HTTP/1.1 404 NOT FOUND\r\n' +
-        'Content-Type: text/plain\r\n' +
-        'Content-Length: 9\r\n' +
-        '\r\n' +
-        'Not Found';
-      socket.write(httpResponse);
-    }
+  // socket.write("HTTP/1.1 200 OK\r\n\r\n");
+  socket.on("close", () => {
     socket.end();
+    server.close();
   });
 
-  socket.on("error", (err) => {
-    console.error(`Socket error: ${err.message}`);
-  });
+  socket.on("data", (data) => {
+    const path = data.toString().split(" ")[1];
+    const responseStatus = path === '/' ? "200 OK" : "404 Not Found";
+    socket.write(`HTTP/1.1 ${responseStatus}\r\n\r\n`);
+  })
 });
 
-server.listen(4221, "localhost", () => {
-  console.log("Listening on localhost:4221");
-});
-
-server.on("error", (err) => {
-  console.error(`Server error: ${err.message}`);
-});
+server.listen(4221, "localhost");
