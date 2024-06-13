@@ -1,13 +1,12 @@
-const { getHeaders, getRequestPath, getBody } = require("./request");
-const { directoryArg } = require("./cli-args");
-const fs = require("fs");
-const types = require("./types");
-
+const {getHeaders, getRequestPath, getBody} = require("./request");
+const {directoryArg} = require("./cli-args");
+const fs = require("fs")
+types = require("./types");
+request = require("./request");
 /**
  * @type {Object<string, Function<Buffer, Response>>}
  */
-let routes = {};
-
+let routes = {}
 /**
  * @param {string} route
  * @param {Function<Buffer, Response>} handler
@@ -16,7 +15,6 @@ let routes = {};
 function addRoute(route, handler, method = "GET") {
     routes[method + route] = handler;
 }
-
 /**
  * @param {Buffer} data
  * @returns {types.Response}
@@ -26,16 +24,15 @@ const notFoundHandler = (data) => {
         new types.StatusCode(404, "Not Found"),
         [],
         ""
-    );
-};
-
+    )
+}
 /**
  * @param {string} url
  * @param {string} method
  * @return {Function<Buffer, Response>}
  */
 function getHandler(url, method) {
-    const routeKey = `${method}${url}`;
+    const routeKey = `${method}${url}`
     let handler = routes[routeKey];
     if (handler === undefined) {
         for (const handlerKey in routes) {
@@ -43,11 +40,10 @@ function getHandler(url, method) {
                 return routes[handlerKey];
             }
         }
-        return notFoundHandler;
+        return notFoundHandler
     }
     return handler;
 }
-
 /**
  * @param {Buffer} data
  * @returns {types.Response}
@@ -58,15 +54,14 @@ const indexHandler = (data) => {
         [],
         ""
     );
-};
-
+}
 /**
  * @param {Buffer} data
  * @returns {types.Response}
  */
 function echoHandler(data) {
     const url = getRequestPath(data);
-    const dataToEcho = url.split("/echo/")[1];
+    const dataToEcho = url.split("/echo/")[1]
     return new types.Response(
         new types.StatusCode(200, "OK"),
         [
@@ -76,21 +71,13 @@ function echoHandler(data) {
         dataToEcho
     );
 }
-
 /**
  * @param {Buffer} data
  * @returns {types.Response}
  */
 const useragentHandler = (data) => {
-    const headers = getHeaders(data);
-    const userAgentHeader = headers.find(header => header.name === "User-Agent");
-    if (!userAgentHeader) {
-        return new types.Response(
-            new types.StatusCode(404, "Not Found"),
-            [],
-            ""
-        );
-    }
+    const headers = getHeaders(data)
+    const userAgentHeader = headers.find(header => header.name === "user-agent")
     return new types.Response(
         new types.StatusCode(200, "OK"),
         [
@@ -99,19 +86,18 @@ const useragentHandler = (data) => {
         ],
         userAgentHeader.value
     );
-};
-
+}
 /**
  * @param {Buffer} data
  * @returns {types.Response}
  */
 const filesGetHandler = (data) => {
     const url = getRequestPath(data);
-    const path = url.split("/files/")[1];
-    const filePath = `${directoryArg}/${path}`;
-    console.log(filePath);
+    const path = url.split("/files/")[1]
+    const filePath = `${directoryArg}/${path}`
+    console.log(filePath)
     try {
-        const body = fs.readFileSync(filePath);
+        const body = fs.readFileSync(filePath)
         return new types.Response(
             new types.StatusCode(200, "OK"),
             [
@@ -119,40 +105,45 @@ const filesGetHandler = (data) => {
                 new types.Header("Content-Length", body.length)
             ],
             body
-        );
+        )
     } catch (error) {
-        console.log(error);
+        console.log(error)
         return new types.Response(
             new types.StatusCode(404, "Not Found"),
             [],
             ""
-        );
+        )
     }
-};
-
+}
 /**
  * @param {Buffer} data
  * @returns {types.Response}
  */
 const filesPostHandler = (data) => {
     const url = getRequestPath(data);
-    const path = url.split("/files/")[1];
-    const filePath = `${directoryArg}/${path}`;
-    const body = getBody(data);
-    fs.writeFileSync(filePath, body);
+    const path = url.split("/files/")[1]
+    const filePath = `${directoryArg}/${path}`
+    const body = getBody(data)
+    fs.writeFileSync(filePath, body)
     return new types.Response(
         new types.StatusCode(201, "Created"),
         [],
         ""
-    );
-};
-
-addRoute("/", indexHandler);
-addRoute("/user-agent", useragentHandler);
-addRoute("/echo/{}", echoHandler);
-addRoute("/files/{}", filesGetHandler);
-addRoute("/files/{}", filesPostHandler, "POST");
-
+    )
+}
+addRoute(
+    "/", indexHandler
+)
+addRoute("/user-agent", useragentHandler)
+addRoute(
+    "/echo/{}", echoHandler
+)
+addRoute(
+    "/files/{}", filesGetHandler
+)
+addRoute(
+    "/files/{}", filesPostHandler, "POST"
+)
 module.exports = {
-    getHandler
-};
+    "getHandler": getHandler
+}
